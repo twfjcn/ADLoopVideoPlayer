@@ -4,29 +4,44 @@ on:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    env:
-      SKIP_JDK_VERSION_CHECK: "true"
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Setup JDK 8
+      # 先装JDK17，用来跑sdkmanager（新版cmdline-tools都要它）
+      - name: Setup JDK17 for sdkmanager
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK cmdline-tools 4.0 (last support JDK8)
+        run: |
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          cd $ANDROID_HOME/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-6858069_latest.zip
+          unzip -q commandlinetools-linux-6858069_latest.zip
+          mv cmdline-tools latest
+          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools"
+        env:
+          ANDROID_HOME: ${{ github.workspace }}/android-sdk
+
+      # 切回JDK8给Gradle2.10编译
+      - name: Setup JDK8 for Gradle 2.10
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '8'
           cache: gradle
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          accept-android-sdk-licenses: true
-
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Build Debug APK
         run: ./gradlew assembleDebug
+        env:
+          ANDROID_HOME: ${{ github.workspace }}/android-sdk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
