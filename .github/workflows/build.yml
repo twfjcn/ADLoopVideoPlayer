@@ -3,10 +3,10 @@ on:
   workflow_dispatch:
 jobs:
   build:
-    runs-on: ubuntu-24.04 # 固定Ubuntu24，避开后续自动切Ubuntu26的变动
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Setup JDK 17
         uses: actions/setup-java@v5
@@ -16,7 +16,7 @@ jobs:
           cache: gradle
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
