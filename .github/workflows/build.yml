@@ -1,39 +1,51 @@
 name: Build APK
 on:
   workflow_dispatch:
+
 jobs:
   build:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Setup JDK17 for sdkmanager
+      - name: Setup JDK 17 (Only for sdkmanager)
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
+      - name: Cache Android SDK
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/android-sdk
+          key: android-sdk-android25-build25.0.3
+
       - name: Install Android SDK cmdline-tools + android-25
         run: |
+          set -e
+          ANDROID_HOME=${{ github.workspace }}/android-sdk
           mkdir -p $ANDROID_HOME/cmdline-tools
           cd $ANDROID_HOME/cmdline-tools
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-6858069_latest.zip
-          unzip -q commandlinetools-linux-6858069_latest.zip
-          mv cmdline-tools latest
-          echo "y" | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-          # 重点：--no_https 绕过ssl问题，补齐老依赖
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --no_https --verbose \
+          if [ ! -d "latest" ]; then
+            wget -q https://dl.google.com/android/repository/commandlinetools-linux-6858069_latest.zip
+            unzip -q commandlinetools-linux-6858069_latest.zip
+            mv cmdline-tools latest
+          fi
+          # 接受协议
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+          # 移除 --no_https，改用国内镜像方案（谷歌官方源ssl现在没问题，如还超时自行换镜像）
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --verbose \
             "platform-tools" \
             "platforms;android-25" \
             "build-tools;25.0.3" \
             "extra;android;m2repository"
-          # 校验是否真的装上android-25
           ls -la $ANDROID_HOME/platforms
         env:
           ANDROID_HOME: ${{ github.workspace }}/android-sdk
 
-      - name: Setup JDK8 for Gradle 2.10
+      - name: Setup JDK 8 (For Gradle 2.10 compile)
         uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -47,6 +59,8 @@ jobs:
         run: ./gradlew assembleDebug
         env:
           ANDROID_HOME: ${{ github.workspace }}/android-sdk
+          # 强制Gradle使用JDK8，防止交叉JDK问题
+          JAVA_HOME: ${{ steps.setup-java.outputs.java-home }}
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
