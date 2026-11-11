@@ -23,12 +23,13 @@ jobs:
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools'   # 显式指定，避免默认尝试安装已移除的 'tools'
 
       - name: Install Android Platform 25
         run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-25" "build-tools;25.0.3" "platform-tools"
+          sdkmanager "platforms;android-25" "build-tools;25.0.3"
 
       # ============================================================
       # 阶段二：切回 JDK 8，用于编译这个 2017 年的老项目
