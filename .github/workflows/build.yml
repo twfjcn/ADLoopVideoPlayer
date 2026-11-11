@@ -1,35 +1,58 @@
-steps:
-  - uses: actions/checkout@v4
+name: Build APK
 
-  # 1. 先安装 JDK 17，以满足 sdkmanager 的运行要求
-  - name: Set up JDK 17 for sdkmanager
-    uses: actions/setup-java@v4
-    with:
-      distribution: 'temurin'
-      java-version: '17'
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master, main ]
 
-  # 2. 现在可以成功运行 setup-android 并安装 SDK
-  - name: Setup Android SDK
-    uses: android-actions/setup-android@v3
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-  - name: Install Android Platform 25
-    run: sdkmanager "platforms;android-25"
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-  # 3. 关键一步：将 JDK 切换回 8，用于编译旧项目
-  - name: Set up JDK 8 for Gradle
-    uses: actions/setup-java@v4
-    with:
-      distribution: 'temurin'
-      java-version: '8'
+      # ============================================================
+      # 阶段一：用 JDK 17 安装 Android SDK（新版 sdkmanager 需要 JDK 17）
+      # ============================================================
+      - name: Set up JDK 17 (for sdkmanager)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-  - name: Grant execute permission for gradlew
-    run: chmod +x gradlew
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-  - name: Build with Gradle
-    run: ./gradlew assembleDebug
+      - name: Install Android Platform 25
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-25" "build-tools;25.0.3" "platform-tools"
 
-  - name: Upload APK
-    uses: actions/upload-artifact@v4
-    with:
-      name: app-debug
-      path: app/build/outputs/apk/debug/*.apk
+      # ============================================================
+      # 阶段二：切回 JDK 8，用于编译这个 2017 年的老项目
+      # ============================================================
+      - name: Set up JDK 8 (for Gradle build)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '8'
+
+      - name: Verify Java version
+        run: java -version
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle (debug)
+        run: ./gradlew assembleDebug --stacktrace --no-daemon
+
+      - name: Upload APK artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 30
